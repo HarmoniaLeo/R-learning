@@ -1,0 +1,71 @@
+### Create your first data frame
+```{r}
+animals=c("Snake","Ostrich","Cat","Spider")
+print(mode(animals))
+legs=c(0,2,4,8)
+print(mode(legs))
+```
+
+```{r}
+df <- data.frame(animals,legs)
+df
+```
+### Matrix operations
+```{r}
+x_vect <- seq(12,2,-2)
+X <- matrix(x_vect,2,3)
+X
+```
+```{r}
+Y <- matrix(seq(4),2,2)
+Z <- matrix(seq(4,10,2),2,2)
+Y
+Z
+t(Y)
+t(Z)
+```
+```{r}
+Y+Z
+Z+Y
+Y%*%Z
+Z%*%Y
+Y*Z
+Z*Y
+Y%*%X
+solve(Y)
+solve(Y)%*%X
+```
+### Writing a simple function within R
+```{r}
+myFirstRFunc <- function(x){
+    stopifnot(is.numeric(x),x%%1 == 0,x>1)
+    sum <- 0
+    for(i in 1:(x-1)){
+        if((i%%7==0)||(i%%2==0)){
+            sum= sum+i
+        }
+    }
+    return(sum)
+}
+myFirstRFunc(14)
+myFirstRFunc(1000)
+```
+### Generating an R markdown notebook
+#### Inclucing blocks of code
+```{r}
+x <- seq(0,20,0.01)
+y <- sin(x)
+sin_df <- data.frame(x,y)
+head(sin_df,3)
+```
+#### Including plots
+```{r}
+plot(x,y)
+```
+
+#### Displaying mathematical formulae
+$y=\sin(x)$
+
+$\sin(x)=\sum_{n=1}^{\infty}(-1)^{n+1}\cdot \frac{x^{2n-1}}{(2n-1)!}\approx x-\frac{x^3}{3!}+\frac{x^5}{5!}-\frac{x^7}{7!}\ldots.$
+
+$A=\left(\begin{matrix} a_{11} & a_{12}\\ a_{21} & a_{22} \end{matrix}\right).$
