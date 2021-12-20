@@ -1,0 +1,297 @@
+# Random experiments, events and sample spaces
+
+1. **What is the random experiment in your example? **
+
+   Throw two dice and calculate the sum of the points on the upward face
+
+2. **What are the possible outcomes in your example? **
+
+   Integer ranged from 2 to 12
+
+3. **What are the events in your example?**
+
+   Sets contain any conbination of intergers ranged from 2 to 12. 
+
+4. **What is the sample space in your example?**
+
+   $\Omega = \{2,3,4,5,6,7,8,9,10,11,12\}$​​
+
+# Tidy data and iteration
+##  Missing data and iteration
+```{R}
+library(tidyverse)
+impute_by_mean <- function(x){
+    mu <- mean(x,na.rm=1)
+    impute_f <- function(z){
+        if(is.na(z)){
+            return(mu)
+        }else{
+            return(z)
+        }
+    }
+    return(map_dbl(x,impute_f))
+}
+x <- seq(0,10,0.1)
+y <- 5*x+1
+df_xy <- data.frame(x,y)
+head(df_xy,5)
+```
+```{R}
+sometimes_missing <- function(index,value){
+    if(index%%5 == 0){
+        return(NA)
+    }
+    else{
+        return(value)
+    }
+}
+df_xy_missing <- df_xy %>%
+mutate(y=map2_dbl(row_number(y),y,~sometimes_missing(.x,.y)))
+df_xy_missing%>%
+head(10)
+```
+```{R}
+impute_by_median <- function(x){
+    mu <- median(x,na.rm=1)
+    impute_f <- function(z){
+        if(is.na(z)){
+            return(mu)
+        }else{
+            return(z)
+        }
+    }
+    return(map_dbl(x,impute_f))
+}
+df_xy_imputed <- df_xy_missing %>%
+mutate(y=impute_by_median(y))
+df_xy_imputed %>% head(10)
+```
+```{R}
+df_xy <- df_xy %>% mutate(source="original")
+df_xy_missing <- df_xy_missing %>% mutate(source="corrupted")
+df_xy_imputed <- df_xy_imputed %>% mutate(source="imputed")
+df_combined <- rbind(df_xy,df_xy_missing,df_xy_imputed)
+```
+```{R}
+ggplot(df_combined,aes(x=x,y=y,color=source))+geom_point()+facet_wrap(~source)+geom_smooth(method="lm")
+```
+
+Seems like imputed values $y_i'$ can't give reasonable estimates of the true value $y_i$. 
+
+## Tidying data with pivot functions
+```{R}
+library(readxl)
+wins_data_frame <- read_excel("HockeyLeague.xlsx",sheet="Wins")
+wins_data_frame %>% 
+select(1:5) %>% 
+head(3)
+```
+This is not tidy data. 
+
+As for tidy data, we should let all wins be contained in a column and all totals be contained in another column, with a column of years corresponding to them. 
+
+However, in this case, we have both wins and totals being contained in same columns, and years are column names. 
+
+```{R}
+wins_tidy <- wins_data_frame %>% 
+pivot_longer(cols=!...1,names_to="Year",values_to = "Wins") %>% 
+rename(Team=...1) %>% 
+separate(Wins,into=c("Wins","Totals"),sep=" of ",convert = TRUE)
+wins_tidy  %>% head(5)
+```
+```{R}
+library(readxl)
+losses_data_frame <- read_excel("HockeyLeague.xlsx",sheet="Losses")
+losses_tidy <- losses_data_frame %>% 
+pivot_longer(cols=!...1,names_to="Year",values_to = "Losses") %>% 
+rename(Team=...1) %>% 
+separate(Losses,into=c("Losses","Totals"),sep=" of ",convert = TRUE)
+losses_tidy  %>% head(5)
+```
+```{R}
+hockey_df <- wins_tidy %>% 
+inner_join(losses_tidy,by=c("Team","Year","Totals"))
+hockey_df_full <- hockey_df  %>% 
+mutate(Draws = Totals- Losses - Wins) %>% 
+mutate(Wins_rt = Wins/Totals,Losses_rt = Losses/Totals,Draws_rt = Draws/Totals)
+```
+```{R}
+hockey_df_full  %>% 
+group_by(Team) %>% 
+select(Wins_rt,Losses_rt,Draws_rt) %>% 
+summarize(across(everything(),list(mean = ~mean(.x,na.rm=TRUE),median = ~median(.x,na.rm=TRUE)))) %>% 
+arrange(desc(Wins_rt_median))
+```
+##  Most correlated variables
+```{R}
+max_cor_var<-function(df,col_name){
+    v_col<-df%>%select(all_of(col_name))
+    df_num<-df%>%
+    select_if(is.numeric)%>%
+    select(-all_of(col_name))
+    correlations<-unlist(map(df_num,
+    function(x){cor(x,v_col,use="complete.obs")}))
+    max_abs_cor_var<-names(which(abs(correlations)==max(abs(correlations))))
+    cor<-as.double(correlations[max_abs_cor_var])
+    return(data.frame(col_name=col_name,cor_name=max_abs_cor_var))
+}
+top_correlates_by_var <- function(df){
+    cols<- df %>% 
+    select_if(is.numeric)%>%
+    colnames()
+    result <- data.frame(col_name=cols,value = map_chr(cols,~unlist(max_cor_var(df,.x)$cor_name)))
+    return(pivot_wider(result,names_from = col_name,values_from = value))
+}
+library(palmerpenguins)
+penguins%>%
+top_correlates_by_var()
+```
+```{R}
+penguins%>%
+group_by(species)%>%
+nest()%>%
+mutate(cors=map(data,top_correlates_by_var))%>%
+select(-data)%>%
+unnest(cols=cors)%>%
+select(-year)
+```
+# Elementary set theory
+## Rolling a dice
+1. **What is A ∪ B?**
+
+   $\{1,2,3,4,6\}$
+
+2. **What is A ∪ C?**
+
+   $\{1,2,3,4,5,6\}$
+
+3. **What is A ∩ B?**
+
+   $\{2\}$
+
+4. **What is A ∩ C?**
+
+   $∅$
+
+5. **What is A \ B?**
+
+   $\{1,3\}$
+
+6. **What is A \ C?**
+
+   $\{1,2,3\}$​
+
+7. **Are A and B disjoint?**
+
+   No
+
+8. **Are A and C disjoint?**
+
+   Yes
+
+9. **Write down a partition of Ω := {1, 2, 3, 4, 5, 6} consisting of two sets**
+
+   $\{1,2,3\}$，$\{4,5,6\}$
+
+10. **Write down another partition of Ω containing three sets.**
+
+    $\{1,2\}$​​，$\{3,4\}$，$\{5,6\}$​​
+
+## Complements, subsets and De Morgan's laws
+
+1. **Can you give an expression for $(A^c )^c$ without using the notion of a complement?**
+
+   $A=(A^c)^c$
+
+2. **What is $Ω^c$ ?**
+
+    $Ω^c=∅$​
+
+3. **Show that if A ⊆ B then $B^c$​ ⊆ $A^c$​**
+
+   $\because x\in B^c$​​ $\therefore x\notin B$​​ 
+
+   $\because A\subseteq B$​​  $\therefore x\notin A$​​ $\therefore x\in A^c$
+
+   $\therefore B^c\subseteq A^c$
+
+4. **Show that $(A ∩ B)^c = A^c ∪ B^c$​​**
+
+   If $x\in (A∩B)^c$​，then it will be either $x\in A$ but $x\notin B$, which means $x \in B^c$, or $x\notin A$ but $x\in B$, which means $x \in A^c$, or $x\notin A$ and $x\notin B$, which means $x \in B^c$ and $x \in A^c$. So $(A ∩ B)^c \subseteq A^c ∪ B^c$​​
+
+   If $x\in A^c∪B^c$，then it will be either $x\in A$ but $x\notin B$, which means $x \notin A∩B$, or $x\notin A$ but $x\in B$, which means $x \notin A∩B$, or $x\notin A$ and $x\notin B$, which means $x \notin A∩B$. So $A^c ∪ B^c \subseteq (A ∩ B)^c$​
+
+5. **Let’s suppose we have a sequence of events...**
+
+   $(∩_{k=1}^KA_k)^c=∪_{k=1}^KA_k^c$
+
+6. **Show that $(A ∪ B)^c = A^c ∩ B^c$​**
+   
+   $\because (A ∩ B)^c = A^c ∪ B^c$ $\therefore (A^c ∩ B^c)^c = A ∪ B$ $\therefore A^c ∩ B^c = (A ∪ B)^c$
+   
+7. **Let’s suppose we have a sequence of events...**
+
+    $(∪_{k=1}^KA_k)^c=∩_{k=1}^KA_k^c$​
+
+## Cardinality and the set of all subsets
+
+**Give a formula for the cardinality of E in terms of K.**
+
+$2^K$
+
+## Disjointness and partitions
+
+1. **Can you think of a set which is disjoint from every other set?...**
+
+​    $∅$
+
+2. **Show that S1, S2, S3, S4 form a partition of A1 ∪ A2 ∪ A3 ∪ A4.**
+
+   Firstly, 
+
+   $\because S_1:=A_1~ S_2:=A_2\backslash A_1$​ $\therefore S_1∩S_2=∅$​ $\therefore S_1∩S_2∩S_3=∅$​ $\therefore S_1∩S_2∩S_3∩S_4=∅$​
+
+   Secondly,
+
+   $\because S_1:=A_1~ S_2:=A_2\backslash A_1$ $\therefore S_1∪S_2:=A_1∪A_2$
+
+   $\because S_3:=A_3\backslash (A_1∪A_2)$ $\therefore S_1∪S_2∪S_3:=A_1∪A_2∪A_3$
+
+   $\because S_4:=A_3\backslash (A_1A_2∪A_3)$​ $\therefore S_1∪S_2∪S_3∪S_4:=A_1∪A_2∪A_3∪A_4$​​
+
+   $\therefore$ S1, S2, S3, S4 form a partition of A1 ∪ A2 ∪ A3 ∪ A4
+
+# Introduction to probability
+## Probability of a complement
+
+**Prove that if Ω is a sample space,...**
+
+$\because S\subseteq \Omega~S^c\equiv \Omega\backslash S$ $\therefore S∪S^c=\Omega$ $\therefore$ According to  third rule of probability $P(S∪S^c)=1$
+
+$\because S\subseteq \Omega~S^c\equiv \Omega\backslash S$ $\therefore S∩S^c=∅$ $\therefore P(S∪S^c)=P(S)+P(S^c)$ $\therefore 1=P(S)+P(S^c)$ $\therefore P(S^c)=1-P(S)$
+
+##  The union bound
+
+**Give an example sequence of set...**
+
+Given that $\Omega=\{0\}$, then $\epsilon = \{∅,{0}\}$. Let $A_n={0}, \forall n\in N$, then $∪_{k=1}^∞A_k={0}$, so $P(∪_{k=1}^∞)=1\neq ∞ =\sum_{k=1}^∞P(A_k)$
+
+##  Verifying the rules of Probability
+
+rule 1: $\because q\in[0,1]$ $\therefore q\geq 0~1-q\geq 0$
+
+rule 2: obviously
+
+rule 3: 
+
+If $A_k$ are picked from $\{∅\}$, then $A_k=∅, ∪_{k=1}^∞A_k=∅$, then $P(∪_{k=1}^∞A_k)=\sum_{k=1}^∞P(A_k)=0$
+
+If ${0,1}$ is picked for only one time and other sets are picked from $\{∅\}$, then $∪_{k=1}^∞A_k=\{0,1\}$, because $\begin{cases}P(A_k)=0,A_k=∅\\P(A_k)=1,A_k=\{0,1\}\end{cases}$, so $P(∪_{k=1}^∞A_k)=\sum_{k=1}^∞P(A_k)=P(\{0,1\})=1$
+
+If ${0}$ is picked for only one time and other sets are picked from $\{∅\}$, then $∪_{k=1}^∞A_k=\{0\}$, because $\begin{cases}P(A_k)=0,A_k=∅\\P(A_k)=1-q,A_k=\{0\}\end{cases}$, so $P(∪_{k=1}^∞A_k)=\sum_{k=1}^∞P(A_k)=P(\{0\})=1-q$
+
+If ${1}$ is picked for only one time and other sets are picked from $\{∅\}$, then $∪_{k=1}^∞A_k=\{1\}$, because $\begin{cases}P(A_k)=0,A_k=∅\\P(A_k)=q,A_k=\{1\}\end{cases}$, so $P(∪_{k=1}^∞A_k)=\sum_{k=1}^∞P(A_k)=P(\{1\})=q$
+
+If each of ${0},{1}$ is picked for only one time and other sets are picked from $\{∅\}$, then $∪_{k=1}^∞A_k=\{0,1\}$, because $\begin{cases}P(A_k)=0,A_k=∅\\P(A_k)=1-q,A_k=\{0\}\\P(A_k)=q,A_k=\{1\}\end{cases}$, so $P(∪_{k=1}^∞A_k)=P(\{0,1\})=1=\sum_{k=1}^∞P(A_k)$
+
+Other situations cannot satisfy the disjoint demand. 

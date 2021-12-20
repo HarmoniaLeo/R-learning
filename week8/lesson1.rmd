@@ -1,0 +1,29 @@
+```{R}
+library("tidyverse")
+library("palmerpenguins")
+ggplot(data=filter(penguins,species=="Adelie"),aes(x=flipper_length_mm))+geom_density()+xlab("Flipper length (mm)")
+```
+```{R}
+ggplot(data=filter(penguins,species=="Adelie"),aes(sample=flipper_length_mm))+stat_qq()+stat_qq_line(color="blue")  #qqplot
+```
+```{R}
+driving_test_results <- c(1,0,1,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,0,1,0)
+mean(driving_test_results)
+library(PropCIs)
+alpha <- 0.05
+num_successes <- sum(driving_test_results)
+sample_size <- length(driving_test_results)
+scoreci(num_successes,sample_size,1-alpha)
+```
+```{R}
+library(boot)
+set.seed(123)
+
+compute_median <- function(df,indicies,col_name){
+    sub_sample <- df %>% slice(indicies) %>% pull(all_of(col_name)) #多行索引以及多列索引
+    return(median(sub_sample,na.rm=1))
+}
+
+results <- boot(data=geyser,statistic = compute_median,col_name="duration",R=10000)
+boot.ci(boot.out=results,type="basic",conf=0.99)
+```

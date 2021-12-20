@@ -1,0 +1,20 @@
+```{R}
+set.seed(0)
+num_trials <- 100000
+sample_size <- 100
+theta_0 <- 5
+log_lik_cauchy <- function(theta,sample_X){return(-sum(log(1+(sample_X-theta)*(sample_X-theta))))}
+theta_ml <- function(sample_X){
+    log_lik_cauchy_X <- function(theta){return(log_lik_cauchy(theta,sample_X))}
+    theta_ml_est <- optimise(f=log_lik_cauchy_X,interval = c(-10,10),maximum = TRUE)$maximum
+    return(theta_ml_est)
+}
+cauchy_simulation_df <- data.frame(trial=seq(num_trials)) %>% 
+mutate(sample=map(.x=trial,~rcauchy(sample_size,location=theta_0))) %>% 
+mutate(ml_est=map_dbl(.x=sample,.f=theta_ml)) %>% 
+mutate(med_est=map_dbl(.x=sample,.f=median))
+cauchy_simulation_df %>% 
+pivot_longer(cols=c(ml_est,med_est)) %>%
+ggplot(mapping=aes(x=value,color=name,linetype=name))+
+geom_density()+xlim(c(4,6))
+```

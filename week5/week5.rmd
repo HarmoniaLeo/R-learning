@@ -1,0 +1,93 @@
+# Simulating data with the uniform distribution
+```{R}
+sample_X_015 <- function(alpha,beta,n){
+    set.seed(0)
+    sample_X <- data.frame(U=runif(n)) %>% 
+    mutate(X=case_when((0<=U)&(U<alpha)~1,(alpha<=U)&(U<alpha+beta)~5,(alpha+beta<=U)&(U<=1)~0)) %>% 
+    pull(X) #where函数实现
+    return(sample_X)
+}
+
+X <- sample_X_015(0.25,0.25,10000)
+mean(X)
+var(X)
+```
+
+# The Gaussian distribution
+```{R}
+data.frame(X=seq(-4,6,0.01)) %>% 
+mutate(norm1=dnorm(X,1,1),norm2=dnorm(X,1,2),norm3=dnorm(X,1,3)) %>% 
+pivot_longer(!X, names_to = "Estimator", values_to = "Value")%>%
+ggplot(aes(x=X,color=Estimator,linetype=Estimator,y=Value))+
+geom_line()+ylab("Density")
+```
+```{R}
+data.frame(X=seq(-4,6,0.01)) %>% 
+mutate(norm1=cumsum(dnorm(X,1,1))*0.01,norm2=cumsum(dnorm(X,1,2))*0.01,norm3=cumsum(dnorm(X,1,3))*0.01) %>% 
+pivot_longer(!X, names_to = "Estimator", values_to = "Value")%>%
+ggplot(aes(x=X,color=Estimator,linetype=Estimator,y=Value))+
+geom_line()+ylab("Density")
+```
+
+```{R}
+data.frame(X=seq(0,1,0.01)) %>% 
+mutate(norm1=qnorm(X,1,1),norm2=qnorm(X,1,2),norm3=qnorm(X,1,3)) %>% 
+pivot_longer(!X, names_to = "Estimator", values_to = "Value")%>%
+ggplot(aes(x=X,color=Estimator,linetype=Estimator,y=Value))+
+geom_line()+ylab("Density")
+```
+```{R}
+set.seed(0)
+standardGaussianSample <- dnorm(seq(-1,1,0.02),0,1)
+mean1Var3GaussianSampleA <- standardGaussianSample*sqrt(3)+1
+set.seed(100)
+mean1Var3GaussianSampleB <- dnorm(seq(-1,1,0.02),1,3)
+```
+# The Binomial distribution and the central limit theorem
+```{R}
+binom_df <- data.frame(x=seq(0,50,1)) %>%
+mutate(pmf=dbinom(x,length(x),7/10))
+binom_df %>% head()
+```
+```{R}
+norm_df <- data.frame(x=seq(0,50,0.01)) %>% 
+mutate(pdf=dnorm(x,50*0.7,sqrt(50*0.7*(1-0.7))))
+norm_df %>% head()
+```
+```{R}
+colors<-c("Gaussian pdf"="red", "Binomial pmf"="blue")
+fill<-c("Gaussian pdf"="white", "Binomial pmf"="white")
+ggplot()+labs(x="x",y="Probability")+theme_bw()+
+geom_line(data=norm_df,
+aes(x,y=pdf,color="Gaussian pdf"),size=2)+
+# create plot of Gaussian density
+geom_col(data=binom_df,
+aes(x=x,y=pmf,color="Binomial pmf",fill="Binomial pmf"))+
+scale_color_manual(name = "", values=colors)+
+scale_fill_manual(name = "", values=fill)+
+xlim(c(20,50))
+```
+# Exponential distribution
+```{R}
+my_cdf_exp <- function(x,lambda){
+    if(x<0){return(0)}
+    else{return(1-exp(-lambda*x))}
+} 
+lambda<-1/2
+map_dbl(.x=seq(-1,4),.f=~my_cdf_exp(x=.x,lambda=lambda))
+```
+```{R}
+test_inputs<-seq(-1,10,0.1)
+my_cdf_output<-map_dbl(.x=test_inputs,.f=~my_cdf_exp(x=.x,lambda=lambda))
+inbuilt_cdf_output<-map_dbl(.x=test_inputs,.f=~pexp(q=.x,rate=lambda))
+all.equal(my_cdf_output,inbuilt_cdf_output)
+```
+```{R}
+my_quantile_exp <- function(p,lambda){
+    return(-log(1-p)/lambda)
+}
+test_inputs<-seq(0.01,0.99,0.1)
+my_cdf_output<-map_dbl(.x=test_inputs,.f=~my_quantile_exp(x=.x,lambda=lambda))
+inbuilt_cdf_output<-map_dbl(.x=test_inputs,.f=~qexp(q=.x,rate=lambda))
+all.equal(my_cdf_output,inbuilt_cdf_output)
+```

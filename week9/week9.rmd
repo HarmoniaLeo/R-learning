@@ -1,0 +1,90 @@
+# 2 An unpaired t test
+```{R}
+library("tidyverse")
+library(palmerpenguins)
+peng_AC<-penguins%>%
+drop_na(species,body_mass_g)%>%
+filter(species!="Gentoo")
+
+t.test(body_mass_g~species, data=peng_AC,var.equal = TRUE)
+```
+```{R}
+x <- c(0,1,1,1,0,0,0,0,1,1,0,1,2,0)
+y <- c(0,0,0,0,0,0,0,1,1,1,1,1,1,1)
+df <- data.frame(x=x,y=y)
+t.test(x~y, data=df,var.equal = FALSE)
+```
+# 4 Investigating test size for an unpaired Student’s t-test
+```{R}
+num_trials<-10000
+sample_size<-30
+mu_0<-1
+mu_1<-1
+sigma_0<-3
+sigma_1<-3
+set.seed(0) # set random seed for reproducibility
+multi_alpha_test_size_simulation_df<-crossing(alpha=seq(0.01,0.1,0.01),trial=seq(num_trials))%>%
+mutate(sample_0=map(.x=trial,.f=~rnorm(n=sample_size,mean=mu_0,sd=sigma_0)),
+sample_1=map(.x=trial,.f=~rnorm(n=sample_size,mean=mu_1,sd=sigma_1)))%>%
+# generate random Gaussian samples
+mutate(p_value=pmap(.l=list(trial,sample_0,sample_1),
+.f=~t.test(..2,..3,var.equal = TRUE)$p.value))%>%
+# generate p values
+mutate(type_1_error=p_value<alpha)
+
+multi_alpha_test_size_simulation_df%>%
+group_by(alpha) %>% 
+select(type_1_error) %>% 
+summarize(across(everything(),list(mean = ~mean(.x,na.rm=TRUE))))%>%
+ggplot(aes(x=alpha,y=type_1_error_mean))+
+geom_smooth()+xlab("alpha")+ylab("type_1_error") 
+```
+# 5 The power of an unpaired t-test
+```{R}
+num_trials<-10000
+n_0<-30
+n_1<-30
+mu_0<-3
+mu_1<-4
+sigma_0<-2
+sigma_1<-2
+set.seed(0) # set random seed for reproducibility
+crossing(alpha=seq(0.01,0.1,0.01),trial=seq(num_trials))%>%
+mutate(sample_0=map(.x=trial,.f=~rnorm(n=n_0,mean=mu_0,sd=sigma_0)),
+sample_1=map(.x=trial,.f=~rnorm(n=n_1,mean=mu_1,sd=sigma_1)))%>%
+# generate random Gaussian samples
+mutate(p_value=pmap(.l=list(trial,sample_0,sample_1),
+.f=~t.test(..2,..3,var.equal = TRUE)$p.value))%>%
+mutate(reject_null=p_value<alpha)%>%
+group_by(alpha) %>% 
+select(reject_null) %>% 
+summarize(across(everything(),list(mean = ~mean(.x,na.rm=TRUE))))%>%
+ggplot(aes(x=alpha,y=reject_null_mean))+
+geom_smooth()+xlab("alpha")+ylab("reject_null") 
+```
+# 6 Comparing the paired and unpaired t-tests
+```{R}
+num_trials<-100
+n_0<-30
+n_1<-30
+mu_0<-3
+mu_1<-1
+sigma_0<-2
+sigma_1<-2
+set.seed(0) # set random seed for reproducibility
+crossing(alpha=seq(0.0025,0.25,0.0025),trial=seq(num_trials))%>%
+mutate(sample_0=map(.x=trial,.f=~rnorm(n=n_0,mean=mu_0,sd=sigma_0)),
+sample_1=map(.x=trial,.f=~rnorm(n=n_1,mean=mu_1,sd=sigma_1)))%>%
+mutate(sample_2=pmap(.l=list(sample_0,sample_1),.f=~(..1+..2)))%>%
+# generate random Gaussian samples
+mutate(unpaired=pmap(.l=list(trial,sample_0,sample_2),
+.f=~t.test(..2,..3,var.equal = TRUE)$p.value))%>%
+mutate(paired=pmap(.l=list(trial,sample_0,sample_2),
+.f=~t.test(..2,..3,paired=TRUE)$p.value))%>%
+pivot_longer(c(unpaired,paired),names_to = "type",values_to = "p_value") %>% 
+mutate(reject_null=p_value<alpha)%>%
+group_by(alpha,type) %>% 
+summarize(reject_null_mean=mean(reject_null))%>%
+ggplot(aes(x=alpha,y=reject_null_mean,color=type,linetype=type))+
+geom_smooth()+xlab("alpha")+ylab("reject_null") 
+```

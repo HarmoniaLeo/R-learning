@@ -1,0 +1,92 @@
+```{R}
+set.seed(0)
+num_trails <- 1000
+sample_size <- 30
+q <- 0.3
+simulation_df <- data.frame(trial=seq(num_trails)) %>% 
+mutate(simulation=map(.x=trial,.f=~rbinom(sample_size,1,q))) %>% 
+mutate(sample_mean=map_dbl(.x=simulation,.f=mean))
+ggplot()+labs(x="Mean",y="Density")+
+geom_density(data=simulation_df,aes(x=sample_mean,color="Sample",linetype="Sample"))+
+geom_vline(aes(xintercept=q,color="Population",linetype="Population"))+ #垂直线，自定义标签
+scale_color_manual(name="Legend",values=c("Sample"="red","Population"="blue"))+ #整合aes
+scale_linetype_manual(name="Legend",values=c("Sample"="solid","Population"="dashed"))
+```
+```{R}
+set.seed(0)
+num_trials_per_sample_size <- 10
+max_sample_size <- 10000
+q <- 0.3
+sim_by_n_df <- crossing(trial=seq(num_trials_per_sample_size),sample_size=seq(to=sqrt(max_sample_size),by=0.1)**2) %>% 
+mutate(simulation=pmap(.l=list(sample_size),.f=~rbinom(.x,1,q))) %>% 
+mutate(sample_mean=map_dbl(.x=simulation,.f=mean))
+ggplot()+labs(x="Sample size",y="Mean")+
+geom_point(data=sim_by_n_df,aes(x=sample_size,y=sample_mean,color="Sample",linetype="Sample"),size=0.1)+
+geom_hline(aes(yintercept=q,color="Population",linetype="Population"),size=1)+
+scale_color_manual(name="Legend",values=c("Population"="red","Sample"="blue"))+ #整合aes
+scale_linetype_manual(name="Legend",values=c("Sample"="dashed","Population"="solid"))+
+scale_x_sqrt()
+```
+```{R}
+set.seed(0)
+num_trials <- 1000
+sample_size <- 30
+mu <- 1
+sigma_sqr <- 3
+simulation_df <- data.frame(trial=seq(num_trials)) %>% 
+mutate(simulation=map(.x=trial,.f=~rnorm(sample_size,mean=mu,sd=sqrt(sigma_sqr)))) %>% 
+mutate(sample_var=map_dbl(.x=simulation,.f=var))
+ggplot()+labs(x="Mean",y="Density")+
+geom_density(data=simulation_df,aes(x=sample_var,color="Sample",linetype="Sample"))+
+geom_vline(aes(xintercept=sigma_sqr,color="Population",linetype="Population"))+ #垂直线，自定义标签
+scale_color_manual(name="Legend",values=c("Sample"="red","Population"="blue"))+ #整合aes
+scale_linetype_manual(name="Legend",values=c("Sample"="solid","Population"="dashed"))
+```
+```{R}
+set.seed(0)
+num_trials_per_sample_size <- 10
+max_sample_size <- 10000
+mu <- 1
+sigma_sqr <- 3
+sim_by_n_df <- crossing(trial=seq(num_trials_per_sample_size),sample_size=seq(to=sqrt(max_sample_size),by=0.1)**2) %>% 
+mutate(simulation=pmap(.l=list(sample_size),.f=~rnorm(.x,mu,sqrt(sigma_sqr)))) %>% 
+mutate(sample_var=map_dbl(.x=simulation,.f=var))
+ggplot()+labs(x="Sample size",y="Mean")+
+geom_point(data=sim_by_n_df,aes(x=sample_size,y=sample_var,color="Sample",linetype="Sample"),size=0.1)+
+geom_hline(aes(yintercept=sigma_sqr,color="Population",linetype="Population"),size=1)+
+scale_color_manual(name="Legend",values=c("Population"="red","Sample"="blue"))+ #整合aes
+scale_linetype_manual(name="Legend",values=c("Sample"="dashed","Population"="solid"))+
+scale_x_sqrt()
+```
+```{R}
+set.seed(0)
+num_trials_per_sample_size <- 10
+max_sample_size <- 10000
+theta <- 1
+sim_by_n_df <- crossing(trial=seq(num_trials_per_sample_size),sample_size=seq(to=sqrt(max_sample_size),by=0.1)**2) %>% 
+mutate(simulation=pmap(.l=list(sample_size),.f=~rcauchy(.x,location=theta))) %>% 
+mutate(sample_mean=map_dbl(.x=simulation,.f=mean))
+ggplot()+labs(x="Sample size",y="Sample mean")+
+geom_point(data=sim_by_n_df,aes(x=sample_size,y=sample_mean,color="Sample mean",linetype="Sample mean"),size=0.1)+
+geom_hline(aes(yintercept=theta,color="Location parameter",linetype="Location parameter"),size=1)+
+scale_color_manual(name="Legend",values=c("Location parameter"="red","Sample mean"="blue"))+ #整合aes
+scale_linetype_manual(name="Legend",values=c("Sample mean"="dashed","Location parameter"="solid"))+
+scale_x_sqrt()+
+ylim(-10,10)
+```
+```{R}
+set.seed(0)
+num_trials_per_sample_size <- 10
+max_sample_size <- 10000
+theta <- 1
+sim_by_n_df <- crossing(trial=seq(num_trials_per_sample_size),sample_size=seq(to=sqrt(max_sample_size),by=0.1)**2) %>% 
+mutate(simulation=pmap(.l=list(sample_size),.f=~runif(.x,location=theta))) %>% 
+mutate(sample_median=map_dbl(.x=simulation,.f=median))
+ggplot()+labs(x="Sample size",y="Sample median")+
+geom_point(data=sim_by_n_df,aes(x=sample_size,y=sample_median,color="Sample median",linetype="Sample median"),size=0.1)+
+geom_hline(aes(yintercept=theta,color="Location parameter",linetype="Location parameter"),size=1)+
+scale_color_manual(name="Legend",values=c("Location parameter"="red","Sample median"="blue"))+ #整合aes
+scale_linetype_manual(name="Legend",values=c("Sample median"="dashed","Location parameter"="solid"))+
+scale_x_sqrt()+
+ylim(-10,10)
+```

@@ -1,0 +1,172 @@
+# Bayes theorem
+
+**What is the conditional probability of rain...**
+
+A and B are independent. 
+
+$\because \begin{align}P(B)&=P(B∩A)+P(B∩A^c)\\&=P(B|A)P(A)+P(B|A^c)P(A^c)\\&=0.72+(1-P(B^c|A^c))(1-P(A))\\&=0.72+0.25*0.1\\&=0.745\end{align}$​​
+
+$\therefore P(A|B)=P(A)P(B|A)/P(B)=0.9*0.8/0.745=0.966$
+
+# Conditional probabilities
+
+1. $P(A|B)=P(A)/P(B)$. If $P(A\backslash B)=0$, then $P(A|B)=1$
+
+2. $P(A|B)=0$. If $P(A∩B)=0$, then $P(A|B)=0$
+
+3. $P(A|B)=1$. If $P(B\backslash A)=0$, then $P(A|B)=1$
+
+4. $P(A|\Omega)=P(A)$
+
+5. $P(C)P(B|C)=P(B∩C)~P(B∩C)P(A|B∩C)=P(A∩B∩C)$ $\therefore P(A∩B∩C)=P(A|B∩C)P(B|C)P(C)$
+
+6. $\because P(A∩B∩C)=P(A|B∩C)P(B∩C)=P(A|B∩C)P(B|C)P(C)~P(A∩B∩C)=P(B|A∩C)P(A∩C)=P(B|A∩C)P(A|C)P(C)$ $\therefore P(A|B∩C)P(B|C)=P(B|A∩C)P(A|C)$ $\therefore P(A|B∩C)=\frac{P(B|A∩C)P(A|C)}{P(B|C)}$
+
+#  Sampling with replacement
+```{R}
+prob_red_spheres <- function(z){
+    return(choose(35,z)*(3^z)*(7^(35-z))/(10^35))
+}
+prob_red_spheres(20)
+```
+```{R}
+library("tidyverse")
+s <- seq(1,35,1)
+s1 <- map(s,~prob_red_spheres(.x)) %>% unlist()
+prob_by_num_reds <- data.frame(num_reds=s,prob=s1)
+prob_by_num_reds %>% head(3)
+```
+```{R}
+library("ggplot2")
+ggplot(data=prob_by_num_reds,aes(x=num_reds,y=prob))+geom_line()+xlab("Number of reds")+ylab("Probability")
+```
+```{R}
+num_trials<-1000
+set.seed(0)
+
+sampling_with_replacement_simulation<-data.frame(trial=1:num_trials)%>%
+mutate(sample_balls=map(.x=trial,~sample(10,35,replace = TRUE))) %>% 
+mutate(num_reds=map_dbl(.x=sample_balls,~sum(.x<=3)))
+sampling_with_replacement_simulation %>% head(3)
+```
+```{R}
+num_reds_in_simulation<-sampling_with_replacement_simulation%>%pull(num_reds)   #抽取数据列
+prob_by_num_reds<-prob_by_num_reds%>%
+mutate(simulation_count=map_dbl(.x=num_reds,~sum(num_reds_in_simulation==.x)))
+prob_by_num_reds<-prob_by_num_reds%>%
+mutate(expected_count=num_trials*prob)
+prob_by_num_reds  %>% head(3)
+```
+```{R}
+prob_by_num_reds%>%
+rename(Simulation=simulation_count,Expected=expected_count)%>%
+pivot_longer(cols=c("Simulation","Expected"),
+names_to="Type",values_to="count")%>%
+ggplot(aes(num_reds,count)) +
+geom_line(aes(linetype=Type, color=Type)) +
+scale_linetype_manual(values = c("solid", "dashed"))+
+theme_bw()+
+xlab("Number of reds")+
+ylab("Count")
+```
+
+# Sampling without replacement
+
+```{R}
+set.seed(0)
+num_trials <- 1000
+num_reds <- 50
+num_blues <- 30
+num_greens <- 20
+sampling_without_replacement_simulation <- data.frame(trial=1:num_trials) %>% 
+mutate(sample_balls=map(.x=trial,~sample(100,10,replace = FALSE))) %>% 
+mutate(num_reds=map_dbl(.x=sample_balls,~sum(.x<=50))) %>% 
+mutate(num_blues=map_dbl(.x=sample_balls,~sum((.x>50)&(.x<=80)))) %>% 
+mutate(num_greens=map_dbl(.x=sample_balls,~sum(.x>80)))
+sampling_without_replacement_simulation %>% head(3)
+```
+```{R}
+sum((sampling_without_replacement_simulation$num_reds==0)|(sampling_without_replacement_simulation$num_blues==0)|(sampling_without_replacement_simulation$num_greens==0))/num_trials
+```
+
+**compute the probability of missing a colour**
+
+Let $A$ be the event that only missing reds. $P(A)=\frac{C_{50}^{10}}{C_{100}^{10}}=0.00059$
+
+Let $B$ be the event that only missing blues. $P(B)=\frac{C_{70}^{10}}{C_{100}^{10}}=0.02292$
+
+Let $C$ be the event that only missing greens. $P(C)=\frac{C_{80}^{10}}{C_{100}^{10}}=0.09512$
+
+So $A∩B$ will be the event that missing both reds and blues. $P(A∩B)=\frac{C_{20}^{10}}{C_{100}^{10}}=1*10^{-8}$
+
+$B∩C$ will be the event that missing both greens and blues. $P(B∩C)=\frac{C_{50}^{10}}{C_{100}^{10}}=0.00059$
+
+$A∩C$ will be the event that missing both reds and greens. $P(A∩C)=\frac{C_{30}^{10}}{C_{100}^{10}}=1.7*10^{-6}$
+
+$A∩B∩C$ will be the event that missing all colour. $P(A∩B∩C)=0$
+
+$A∪B$ will be the event that missing either reds or blues. $P(A∪B)=P(A)+P(B)-P(A∩B)=0.02351$
+
+$B∪C$ will be the event that missing either greens or blues. $P(B∪C)=P(B)+P(C)-P(B∩C)=0.11745$
+
+$A∪C$ will be the event that missing either reds or greens. $P(A∪C)=P(A)+P(C)-P(A∩C)=0.09571$
+
+$A∪B∪C$ will be the event that missing a colour. $P(A∪B∪C)=P(A∪B)+P(C)-P((A∪B)∩C)=P(A∪B)+P(C)-(P(A∩C)+P(B∩C)-P(A∩B∩C))=0.11804$
+
+#  Mutual independence and pair-wise independent
+
+$A ∩ B ∩ C := ∅$ , so $P(A ∩ B ∩ C)=0$
+
+$\because P(A)P(B)P(C)\neq 0=P(A ∩ B ∩ C)$, A,B,C are not mutually independent
+
+# The Monty hall problem
+
+$P(A_3|B_1∩C_2)=P(A_3∩B_1∩C_2)/P(B_1∩C_2)=P(C_2|A_3∩B_1)P(A_3∩B_1)/(P(B_1)P(C_2|B_1))$
+
+According to assumption 1 and 2, we have $P(A_3∩B_1)=P(A_3)P(B_1)=1/9$ and $P(B_1)=1/3$
+
+According to assumption 3, we have $P(C_2|A_3∩B_1)=1$ and $\begin{aligned}P(C_2|B_1)&=P(C_2∩A_1|B_1)+P(C_2∩A_2|B_1)+P(C_2∩A_3|B_1)\\&=P(C_2|B_1∩A_1)P(A_1)+P(C_2|B_1∩A_2)P(A_2)+P(C_2|B_1∩A_3)P(A_3)\\&=\frac{1}{2}*\frac{1}{3}+0+1*\frac{1}{3}=1/2\end{aligned}$
+
+So $P(A_3|B_1∩C_2)=1*\frac{1}{9}/(\frac{1}{3}*\frac{1}{2})=\frac{2}{3}$
+
+This suggest that switching choice is a good strategy. 
+
+# A game of marbles
+
+Let $P_n$ be the probability that player A wins the game when A has n marbles. 
+
+When $k=2$​​，$P_1=p$​​，therefore $P_n=p$​
+
+When $k=3$​
+
+$\begin{cases}P_1=pP_2\\P_{2}=p+(1-p)P_{1}\end{cases}$​
+
+$\therefore P_2=\frac{p}{1-p+p^2},P_1=\frac{p^2}{1-p+p^2}$​​
+
+$\therefore P_n=\frac{p^{3-n}}{1-p+p^2}$​​
+
+When $k>3$​
+
+$\begin{cases}P_n=pP_{n+1}+(1-p)P_{n-1},n\in(1,k-1)\\P_1=pP_2\\P_{k-1}=p+(1-p)P_{k-2}\end{cases}$​
+
+$\therefore (1-p)P_n+pP_n=pP_{n+1}+(1-p)P_{n-1}$​
+
+$\therefore (1-p)(P_n-P_{n-1})=p(P_{n+1}-P_n)$
+
+$\therefore \frac{P_{n+1}-P_n}{P_n-P_{n-1}}=\frac{1-p}{p}$​
+
+$\because P_{k-1}-P_{k-2}=p-pP_{k-2}=p(1-P_{k-2}),~P_{2}-P_{1}=(1-p)P_2$
+
+$\therefore (1-p)P_2(\frac{1-p}{p})^{k-3}=p(1-P_{k-2})$​
+
+$\because P_{k-2}-P_2=(P_3-P_2)+(P_4-P_3)...+(P_{k-3}-P_{k-4})+(P_{k-2}-P_{k-3})=\frac{(1-p)^2}{p}P_2\frac{1-(\frac{1-p}{p})^{k-4}}{1-\frac{1-p}{p}}$​​​​
+
+$\therefore (1-p)P_2(\frac{1-p}{p})^{k-3}=p(1-\frac{(1-p)^2}{p}P_2\frac{1-(\frac{1-p}{p})^{k-4}}{1-\frac{1-p}{p}}-P_2)$​
+
+$\therefore P_2\frac{(1-p)^{k-2}}{p^{k-3}}=p-(1-p)^2P_2\frac{1-(\frac{1-p}{p})^{k-4}}{1-\frac{1-p}{p}}-pP_2$​​
+
+$\therefore P_2=\frac{p}{\frac{(1-p)^{k-2}}{p^{k-3}}+(1-p)^2\frac{1-(\frac{1-p}{p})^{k-4}}{1-\frac{1-p}{p}}+p}$​
+
+$\therefore P_1=\frac{p^2}{\frac{(1-p)^{k-2}}{p^{k-3}}+(1-p)^2\frac{1-(\frac{1-p}{p})^{k-4}}{1-\frac{1-p}{p}}+p}$
+
+$\therefore P_n=\frac{p^2}{\frac{(1-p)^{k-2}}{p^{k-3}}+(1-p)^2\frac{1-(\frac{1-p}{p})^{k-4}}{1-\frac{1-p}{p}}+p}+\frac{p-p^2}{\frac{(1-p)^{k-2}}{p^{k-3}}+(1-p)^2\frac{1-(\frac{1-p}{p})^{k-4}}{1-\frac{1-p}{p}}+p}\frac{1-(\frac{1-p}{p})^{n-1}}{1-\frac{1-p}{p}}$​​​

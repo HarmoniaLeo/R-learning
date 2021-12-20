@@ -1,0 +1,152 @@
+# A Gaussian model for Red tailed hawks
+```{R}
+library(Stat2Data)
+data("Hawks")
+library("tidyverse")
+RedTailedDF <- Hawks %>% 
+filter(Species=="RT") %>% 
+select(Weight,Tail,Wing)
+head(RedTailedDF)
+```
+```{R}
+mu <- mean(RedTailedDF$Tail)
+sigma <- sqrt(var(RedTailedDF$Tail))
+```
+```{R}
+x <- seq(mu-3*sigma,mu+3*sigma,sigma*0.01)
+df_gaussian <- data.frame(x,MLE_tail=dnorm(x,mu,sigma),Source="MLE density")  #某一系列全是某一字符串
+ggplot() + geom_line(data=df_gaussian,aes(x=x,y=MLE_tail,color="MLE density")) + geom_density(data=RedTailedDF,aes(x=Tail,color="Kernel density"))+ylab("Tail length (mm)")
+#画两种图
+```
+# Location estimators with Gaussian data
+```{R}
+set.seed(0)
+num_trials_per_sample_size<-100
+min_sample_size<-5
+max_sample_size<-1000
+sample_size_inc<-5
+mu_0<-1
+sigma_0<-3
+simulation_df<-crossing(trial=seq(num_trials_per_sample_size),
+sample_size=seq(min_sample_size,max_sample_size,sample_size_inc))%>%
+# create data frame of all pairs of sample_size and trial
+mutate(simulation=pmap(.l=list(trial,sample_size),.f=~rnorm(.y,mean=mu_0,sd=sigma_0)))%>%
+# simulate sequences of Gaussian random variables
+mutate(sample_md=map_dbl(.x=simulation,.f=median))%>%
+# compute the sample medians
+mutate(sample_mn=map_dbl(.x=simulation,.f=mean))%>%
+# compute the sample means
+group_by(sample_size)%>%
+summarise(msq_error_md=mean((sample_md-mu_0)*(sample_md-mu_0)),msq_error_mn=mean((sample_mn-mu_0)*(sample_mn-mu_0)))
+```
+```{R}
+simulation_df%>%
+pivot_longer(cols=c(msq_error_md,msq_error_mn),names_to="Estimator",values_to="msq_error")%>%
+mutate(Estimator=case_when(Estimator=="msq_error_md"~"Median",Estimator=="msq_error_mn"~"Mean"))%>% #where的用法
+ggplot(aes(x=sample_size,y=msq_error,color=Estimator,linetype=Estimator))+
+geom_smooth()+theme_bw()+xlab("Sample size")+ylab("Mean square error")
+```
+# Unbiased estimation of the population variance
+```{R}
+set.seed(0)
+num_trials_per_sample_size<-100
+min_sample_size<-5
+max_sample_size<-1000
+sample_size_inc<-5
+mu_0<-1
+sigma_0<-3
+simulation_df<-crossing(trial=seq(num_trials_per_sample_size),
+sample_size=seq(min_sample_size,
+max_sample_size,sample_size_inc))%>%
+# create data frame of all pairs of sample_size and trial
+mutate(simulation=pmap(.l=list(trial,sample_size),
+.f=~rnorm(.y,mean=mu_0,sd=sigma_0)))%>%
+mutate(sample_mean=map_dbl(.x=simulation,.f=mean))%>%
+# compute the sample medians
+group_by(sample_size)%>%
+summarise(msq_error_mean=mean((sample_mean-mu_0)*(sample_mean-mu_0)))
+
+ggplot()+geom_smooth(data=simulation_df,aes(x=sample_size,y=msq_error_mean))+ylim(c(0,0.5))+scale_x_sqrt()
+```
+```{R}
+set.seed(0)
+
+var1 <- function(x,y){
+    return(1/y*sum((x-mean(x))*(x-mean(x))))
+}
+
+num_trials_per_sample_size<-1000
+min_sample_size<-5
+max_sample_size<-100
+sample_size_inc<-5
+mu_0<-1
+sigma_0<-3
+simulation_df<-crossing(trial=seq(num_trials_per_sample_size),
+sample_size=seq(min_sample_size,
+max_sample_size,sample_size_inc))%>%
+# create data frame of all pairs of sample_size and trial
+mutate(simulation=pmap(.l=list(trial,sample_size),
+.f=~rnorm(.y,mean=mu_0,sd=sigma_0)))%>%
+mutate(sample_var0=map_dbl(.x=simulation,.f=var))%>%
+mutate(sample_var1=pmap_dbl(.l=list(.x=simulation,.y=sample_size),.f=~var1(.x,.y)))%>%
+# compute the sample medians
+group_by(sample_size)%>%
+summarise(msq_error_var0=mean(sample_var0)-sigma_0*sigma_0,msq_error_var1=mean(sample_var1)-sigma_0*sigma_0)
+
+simulation_df_longer <- simulation_df %>% 
+pivot_longer(cols=c("msq_error_var0","msq_error_var1"),names_to="Estimator",values_to = "Mean_square_error")
+
+ggplot()+geom_smooth(data=simulation_df_longer,aes(x=sample_size,y=Mean_square_error,color=Estimator,linetype=Estimator))
+```
+# Maximum likelihood estimation with the Poisson distribution
+```{R}
+set.seed(0)
+num_trials_per_sample_size<-1000
+min_sample_size<-5
+max_sample_size<-100
+sample_size_inc<-5
+lambda <- 0.5
+simulation_df<-crossing(trial=seq(num_trials_per_sample_size),
+sample_size=seq(min_sample_size,
+max_sample_size,sample_size_inc))%>%
+# create data frame of all pairs of sample_size and trial
+mutate(simulation=pmap(.l=list(trial,sample_size),
+.f=~rpois(.y,lambda)))%>%
+mutate(sample_mean=map_dbl(.x=simulation,.f=mean))%>%
+# compute the sample medians
+group_by(sample_size)%>%
+summarise(msq_error_mean=mean((sample_mean-lambda)*(sample_mean-lambda)))
+
+ggplot()+geom_smooth(data=simulation_df,aes(x=sample_size,y=msq_error_mean))
+```
+```{R}
+kickfatal <- read.csv("week7/VonBortkiewicz.csv")
+kickfatal
+```
+```{R}
+mu <- mean(kickfatal$fatalities)
+mu
+```
+```{R}
+x <- seq(0,5,0.1)
+df_gaussian <- data.frame(x,MLE_fatal=dpois(x,mu),Source="MLE density")  #某一系列全是某一字符串
+ggplot() + geom_smooth(data=df_gaussian,aes(x=x,y=MLE_fatal,color="MLE density")) + geom_density(data=kickfatal,aes(x=fatalities,color="Kernel density"))+ylab("Density")
+#画两种图
+dpois(0,mu)
+```
+# Maximum likelihood estimation of the exponential distribution
+```{R}
+custompurchase <- read.csv("week7/CustomerPurchases.csv")
+custompurchase <- custompurchase %>% mutate(time_diffs=lead(Time)-Time)
+```
+```{R}
+mu <- mean(custompurchase$time_diffs,na.rm=TRUE)
+1/mu
+```
+```{R}
+x <- seq(0,400,1)
+df_gaussian <- data.frame(x,MLE_time=dexp(x,1/mu),Source="MLE density")  #某一系列全是某一字符串
+ggplot() + geom_smooth(data=df_gaussian,aes(x=x,y=MLE_time,color="MLE density")) + geom_density(data=custompurchase,aes(x=time_diffs,color="Kernel density"))+ylab("Density")
+#画两种图
+1-pexp(60,1/mu)
+```

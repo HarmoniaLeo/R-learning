@@ -1,0 +1,185 @@
+# Student’s t-confidence intervals
+```{R}
+library(Stat2Data)
+data("Hawks")
+rts <- Hawks %>% 
+filter(Species=="RT")
+weight <- rts$Weight
+```
+```{R}
+ggplot(data=rts,aes(x=Weight))+geom_density()+xlab("Weight")
+```
+```{R}
+ggplot(data=rts,aes(sample=Weight))+stat_qq()+stat_qq_line(color="blue")
+```
+```{R}
+alpha<-0.01
+sample_size<-length(weight)
+sample_mean<-mean(weight,na.rm=1)
+sample_sd<-sd(weight,na.rm=1)
+t<-qt(1-alpha/2,df=sample_size-1)
+confidence_interval_l<-sample_mean-t*sample_sd/sqrt(sample_size)
+confidence_interval_u<-sample_mean+t*sample_sd/sqrt(sample_size)
+confidence_interval<-c(confidence_interval_l,confidence_interval_u)
+confidence_interval
+```
+# One sample t-test
+```{R}
+library("palmerpenguins")
+bill_adelie <- penguins %>% 
+filter(species=="Adelie")
+bill_adelie <- bill_adelie$bill_length_mm
+t.test(x=bill_adelie,mu=40,conf.level=0.99)
+```
+```{R}
+seq <- c(0,1,1,1,0,0,0)
+t.test(x=seq,mu=0.5,alternative="less")
+```
+# Implementing a one-sample t-test
+```{R}
+ttest <- function(x,mu){
+    n <- length(na.exclude(x))
+    t <- (mean(x,na.rm=1)-mu)/(sd(x,na.rm=1)/sqrt(n))
+    return(2*(1-pt(abs(t),n-1)))
+}
+ttest(bill_adelie,40)
+```
+# The paired t-test
+```{R}
+library(PairedData)
+data("Barley")
+Barley
+```
+```{R}
+t.test(x=Barley$Glabron,y=Barley$Velvet,paired=TRUE,conf.level=0.99)
+```
+```{R}
+mean(Barley$Glabron-Barley$Velvet)/sd(Barley$Glabron-Barley$Velvet)
+```
+```{R}
+ggplot(data=Barley,aes(sample=Glabron-Velvet))+stat_qq()+stat_qq_line(color="blue")
+```
+```{R}
+seq <- c(0,1,1,1,0,0,0)
+seq1 <- c(0,1,1,1,1,0,0)
+t.test(x=seq,y=seq1,paired=TRUE)
+```
+# Investigating coverage for Student’s t intervals
+```{R}
+student_t_confidence_interval<-function(sample,confidence_level){
+sample<-sample[!is.na(sample)] # remove any missing values
+n<-length(sample) # compute sample size
+mu_est<-mean(sample) # compute sample mean
+sig_est<-sd(sample) # compute sample sd
+alpha = 1-confidence_level # alpha from gamma
+t<-qt(1-alpha/2,df=n-1) # get student t quantile
+l=mu_est-(t/sqrt(n))*sig_est # lower
+u=mu_est+(t/sqrt(n))*sig_est # upper
+return(c(l,u))
+}
+```
+```{R}
+num_trials<-100000
+sample_size<-30
+mu_0<-1
+sigma_0<-3
+set.seed(0) # set random seed for reproducibility
+single_alpha_coverage_simulation_df<-crossing(trial=seq(num_trials),
+gamma=seq(0.9,1.0,0.01))%>%
+mutate(sample=map(.x=trial,.f=~rnorm(n=sample_size,mean=mu_0,sd=sigma_0)))%>%
+# generate random Gaussian samples
+mutate(ci_interval=pmap(.l=list(sample,gamma),.f=~)%>%
+# generate confidence intervals
+mutate(cover=map_lgl(.x=ci_interval,.f=~((min(.x)<=mu_0)&(max(.x)>=mu_0))))%>%
+# check if interval covers mu_0
+mutate(ci_length=map_dbl(.x=ci_interval,.f=~(max(.x)-min(.x)))) %>% 
+# compute interval length
+group_by(gamma) %>%
+summarise(mean_cover=mean(cover),e_length=mean(cover*ci_length))
+```
+```{R}
+ggplot(single_alpha_coverage_simulation_df,aes(x=gamma,y=mean_cover))+
+geom_smooth()+theme_bw()+xlab("gamma")+ylab("cover")
+```
+```{R}
+ggplot(single_alpha_coverage_simulation_df,aes(x=gamma,y=e_length))+
+geom_smooth()+theme_bw()+xlab("gamma")+ylab("length")
+```
+# Wilson’s confidence interval for proportions
+```{R}
+library(PropCIs)
+driving_test_results<-case_when((weight>1)~1,(weight<=1)~0)
+driving_test_results <- na.exclude(driving_test_results)
+alpha<-0.05
+
+sequ=c(0,1,1,1,0,0,0)
+num_successes<- sum(sequ)
+sample_size<-length(sequ)
+scoreci(x=3, n=7, conf.level=0.95)
+```
+# The Binomial test
+```{R}
+library(Stat2Data)
+data("Airlines")
+names(Airlines)
+```
+```{R}
+s <- case_when((Airlines$OnTime=="yes")~1,(Airlines$OnTime=="No")~0)
+s <- na.exclude(s)
+binom.test(sum(s),length(s),0.875)
+```
+```{R}
+s=c(0,1,1,1,0,0,0)
+binom.test(sum(s),length(s),0.3)
+```
+# Bootstrap confidence intervals
+```{R}
+library(boot) # load the library
+set.seed(123) # set random seed
+#first define a function which computes the mean of a column of interest
+compute_median<-function(df,indicies,col_name){
+sub_sample<-df%>%slice(indicies)%>%pull(all_of(col_name)) # extract subsample
+return(median(sub_sample,na.rm=1))}# return median
+# use the boot function to generate the bootstrap statistics
+results<-boot(data = Hawks,statistic =compute_median,col_name="Weight",R = 1000)
+# compute the 95%-level confidence interval for the mean
+boot.ci(boot.out = results, type = "basic",conf=0.95)
+```
+# Investigating the failure probability for Wilson’s method
+```{R}
+wilson_confidence_interval<-function(sample,confidence_level){
+num_successes<- sum(sample)
+sample_size<-length(sample)
+res <- scoreci(x=num_successes, n=sample_size, conf.level=confidence_level)
+l <- res$conf.int[1]
+u <- res$conf.int[2]
+return(c(l,u))
+}
+```
+```{R}
+num_trials<-10000
+q <- 0.5
+set.seed(0) # set random seed for reproducibility
+single_alpha_coverage_simulation_df<-crossing(trial=seq(num_trials),
+gamma=seq(0.9,1.0,0.01))%>%
+mutate(sample=map(.x=trial,.f=~rbernoulli(100,q)))%>%
+# generate random Gaussian samples
+mutate(ci_interval=pmap(.l=list(sample,gamma),.f=~wilson_confidence_interval(..1,..2)))%>%
+# generate confidence intervals
+mutate(cover=map_lgl(.x=ci_interval,.f=~((min(.x)<=q)&(max(.x)>=q))))%>%
+# check if interval covers mu_0
+group_by(gamma) %>%
+summarise(mean_cover=mean(cover))
+```
+```{R}
+ggplot(single_alpha_coverage_simulation_df,aes(x=gamma,y=mean_cover))+
+geom_smooth()+theme_bw()+xlab("gamma")+ylab("cover")
+```
+# Effect size for the one sample t-test
+```{R}
+effect_size_one_sample_t_tes <- function(x,mu){
+    return((mean(x,na.rm=1)-mu)/(1/(length(na.exclude(x))-1)*sum((na.exclude(x)-mean(x,na.rm=1))*(na.exclude(x)-mean(x,na.rm=1)))))
+}
+
+effect_size_one_sample_t_tes(bill_adelie,40)
+```

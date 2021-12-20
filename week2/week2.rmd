@@ -1,3 +1,108 @@
 ```{R}
-
+library("tidyverse")
+library(Stat2Data)
+data("Hawks")
+hawksSmall<-drop_na(select(Hawks,Age,Day,Month,Year,CaptureTime,Species,Wing,Weight,Tail))
+```
+## Visualisation
+```{R}
+ggplot(data=hawksSmall,aes(x=Weight))+xlab("Weight (gm)")+geom_histogram(binwidth=100)+ylab("Count")
+```
+```{R}
+ggplot(data=hawksSmall,aes(x=Tail))+xlab("Tail (mm)")+geom_density(adjust=0.5)+ylab("Count")
+```
+```{R}
+ggplot(data=hawksSmall,aes(x=Tail,color=Species))+xlab("Tail (mm)")+geom_density(adjust=0.5)+ylab("Count")
+```
+```{R}
+ggplot(data=hawksSmall,aes(x=Tail,y=Species,fill=Species))+xlab("Tail (mm)")+geom_violin()+ylab("Species")
+```
+```{R}
+ggplot(data=hawksSmall,aes(y=Weight,x=Tail))+ylab("Weight (gm)")+xlab("Tail (mm)")+geom_point(aes(color=Species,shape=Species))
+```
+```{R}
+ggplot(data=hawksSmall,aes(y=Weight,x=Tail))+ylab("Weight (gm)")+xlab("Tail (mm)")+geom_point(aes(color=Species))+geom_smooth(method="lm",aes(color=Species))+facet_wrap(~Species,scales="free")
+```
+## Data wrangling
+```{R}
+hSF <- hawksSmall  %>% 
+filter(Species=="RT",Weight>=1000) %>% 
+select(Wing,Weight,Tail)
+head(hSF)
+```
+```{R}
+head(arrange(hSF,Wing))
+```
+```{R}
+Species  <- unique(hawksSmall$Species)
+full_name <- c("Red-tailed","Cooper's","Sharp-shinned")
+hawksFullName <- data.frame(Species,full_name)
+hawksFullName <- hawksSmall  %>% 
+left_join(hawksFullName,by=c("Species")) %>% 
+select(full_name,Wing,Weight)
+head(hawksFullName)
+```
+```{R}
+hawksWithBMI <- hawksSmall %>% 
+mutate(bird_BMI=1000*Weight/(Wing)^2) %>% 
+select(Species,bird_BMI) %>% 
+arrange(desc(bird_BMI))
+head(hawksWithBMI)
+```
+```{R}
+ggplot(data=filter(hawksWithBMI,bird_BMI<=100),aes(x=bird_BMI,y=Species,fill=Species))+xlab("Bird BMI")+geom_violin()+ylab("Species")+scale_x_log10()
+```
+```{R}
+hawksSmall  %>% 
+group_by(Species) %>% 
+summarize(num_rows=n(),mn_wing=mean(Wing,na.rm=TRUE),md_wing=median(Wing,na.rm=TRUE),t_mn_wing=mean(Wing,na.rm=TRUE,trim=0.1),tail_wing_ratio=mean(Wing/Tail,na.rm=TRUE))
+```
+```{R}
+Hawks %>% 
+group_by(Species) %>% 
+select(Wing,Weight,Culmen,Hallux,Tail,StandardTail,Tarsus,Crop) %>% 
+summarize(across(everything(),~sum(is.na(.x))))
+```
+## EDA
+```{R}
+hawksSmall  %>% 
+summarize(Wing_mean=mean(Wing,na.rm=TRUE),Wing_t_mean=mean(Wing,na.rm=TRUE,trim=0.1),Wing_med=median(Wing,na.rm=TRUE),Weight_mean=mean(Weight,na.rm=TRUE),Weight_t_mean=mean(Weight,na.rm=TRUE,trim=0.1),Weight_med=median(Weight,na.rm=TRUE))
+```
+```{R}
+hawksSmall  %>% 
+group_by(Species)  %>% 
+summarize(Wing_mean=mean(Wing,na.rm=TRUE),Wing_t_mean=mean(Wing,na.rm=TRUE,trim=0.1),Wing_med=median(Wing,na.rm=TRUE),Weight_mean=mean(Weight,na.rm=TRUE),Weight_t_mean=mean(Weight,na.rm=TRUE,trim=0.1),Weight_med=median(Weight,na.rm=TRUE))
+```
+```{R}
+hal <- Hawks$Hallux
+hal <- hal[!is.na(hal)]
+outlier_val <- 100
+num_outlier  <- 10
+corrupted_hal <- c(hal,rep(outlier_val,times=num_outlier))
+mean(hal)
+mean(corrupted_hal)
+num_outliers_vect<-seq(0,1000)
+means_vect<-c()
+t_means_vect<-c()
+medians_vect<-c()
+for(num_outliers in num_outliers_vect){
+    corrupted_hal<-c(hal,rep(outlier_val,times=num_outliers))
+    means_vect<-c(means_vect,mean(corrupted_hal))
+    t_means_vect<-c(t_means_vect,mean(corrupted_hal,trim=0.1))
+    medians_vect<-c(medians_vect,median(corrupted_hal))
+}
+df_means_medians<-data.frame(num_outliers=num_outliers_vect,mean=means_vect,t_mean=t_means_vect,median=medians_vect)
+df_means_medians%>%
+pivot_longer(!num_outliers, names_to = "Estimator", values_to = "Value")%>%
+ggplot(aes(x=num_outliers,color=Estimator,linetype=Estimator,y=Value))+
+geom_line()+xlab("Number of outliers")
+```
+```{R}
+ggplot(Hawks,aes(x=Species,y=Weight))+geom_boxplot()+xlab("Number of outliers")
+```
+```{R}
+Hawks %>% 
+group_by(Species) %>% 
+filter((Weight<quantile(Weight,0.25,na.rm=1)-1.5*(quantile(Weight,0.75,na.rm=1)-quantile(Weight,0.25,na.rm=1)))|(Weight>quantile(Weight,0.75,na.rm=1)+1.5*(quantile(Weight,0.75,na.rm=1)-quantile(Weight,0.25,na.rm=1)))) %>% 
+summarise(num_rows=n())
 ```
